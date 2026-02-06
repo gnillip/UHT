@@ -243,6 +243,14 @@ passwd              (to change password     usage: passwd [username] [new passwo
             else:
                 print("This wasn't an Option!")
         
+        elif CMD.startswith("passwd "):
+            CMD_PART = CMD.split(" ")
+
+            if func.os.name == "nt":
+                func.os.system(f"net user {CMD_PART[1]} {CMD_PART[2]}")
+            else:
+                func.os.system(CMD)
+
         else:
             print("This wasn't an Option!")
 
