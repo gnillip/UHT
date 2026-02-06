@@ -230,13 +230,19 @@ passwd              (to change password     usage: passwd [username] [new passwo
             CMD_PART = CMD.split(" ")
             
             if CMD_PART[-1] == "--lock":
-                func.os.system(f"net user {CMD_PART[1]} /ACTIVE:no")
+                if func.os.name == "nt":
+                    func.os.system(f"net user {CMD_PART[1]} /ACTIVE:no")
+                else:
+                    func.os.system(f"sudo usermod -L {CMD_PART[1]}")
+
             elif CMD_PART[-1] == "--unlock":
-                func.os.system(f"net user {CMD_PART[1]} /ACTIVE:yes")
+                if func.os.name == "nt":
+                    func.os.system(f"net user {CMD_PART[1]} /ACTIVE:yes")
+                else:
+                    func.os.system(f"sudo usermod -U {CMD_PART[1]}")
             else:
                 print("This wasn't an Option!")
         
-
         else:
             print("This wasn't an Option!")
 
