@@ -1,4 +1,5 @@
 import func, colorama, time
+from cryptography.fernet import Fernet
 
 colorama.init()
 
@@ -20,8 +21,8 @@ port-scan           (for scanning ports of an IP address)
 socket              (for socket communication)
     - socket::enc   (for encrypted communication between 2 UHT's)
     - socket::uni   (for universal communication, where you can send and recieve an Answer)
-encrypt             (to encrypt a file)
-decrypt             (to decrypt a file, which was encrypted before)
+encrypt / enc       (to encrypt a file)
+decrypt / dec       (to decrypt a file, which was encrypted before)
 net                 (for locking / unlocking    usage: net [username] --lock or net [username] --unlock)
 passwd              (to change password     usage: passwd [username] [new password])
 {colorama.Fore.GREEN}""")
@@ -180,6 +181,50 @@ passwd              (to change password     usage: passwd [username] [new passwo
             else:
                 print("This wasn't an Option!")
                 continue
+
+        elif CMD in ["encrypt", "enc"]:
+            FILEPATH = func.generall.ask("Filepath: ", colorama.Fore.GREEN)
+            KEY_FILE = func.generall.ask("KEY filename (Nothing = standard): ", colorama.Fore.GREEN) or FILEPATH+".key"
+
+            if not func.os.path.exists(FILEPATH):
+                print(colorama.Fore.RED, "This Path doesn't exist! (Filepath: )", colorama.Fore.GREEN)
+                continue
+
+            KEY = Fernet.generate_key()
+            fernet = Fernet(KEY)
+
+            with open(KEY_FILE, "wb") as key_file:
+                key_file.write(KEY)
+
+            with open(FILEPATH, "rb") as original_file:
+                enc = fernet.encrypt( original_file.read() )
+            
+            with open(FILEPATH+".encrypted", "wb") as enc_file:
+                enc_file.write(enc)
+
+            func.os.remove(FILEPATH)
+            print("[*] Done!")
+        
+        elif CMD in ["decrypt", "dec"]:
+            FILEPATH:str = func.generall.ask("Filepath: ", colorama.Fore.GREEN)
+            KEY_FILE:str = func.generall.ask("KEY filename: ", colorama.Fore.GREEN)
+
+            if not func.os.path.exists(FILEPATH) or not func.os.path.exists(KEY_FILE):
+                print(colorama.Fore.RED, "This Path doesn't exist! (I dont know which of them)", colorama.Fore.GREEN)
+                continue
+            
+            KEY = open(KEY_FILE, "rb").read()
+            fernet = Fernet(KEY)
+
+            with open(FILEPATH, "rb") as enc_file:
+                content = fernet.decrypt( enc_file.read() )
+            
+            with open(FILEPATH.replace(".encrypted", ""), "wb") as original_file:
+                original_file.write(content)
+            
+            func.os.remove(FILEPATH)
+            func.os.remove(KEY_FILE)
+            print("[*] Done!")
 
         else:
             print("This wasn't an Option!")
