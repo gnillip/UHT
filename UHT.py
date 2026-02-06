@@ -226,6 +226,17 @@ passwd              (to change password     usage: passwd [username] [new passwo
             func.os.remove(KEY_FILE)
             print("[*] Done!")
 
+        elif CMD.startswith("net "):
+            CMD_PART = CMD.split(" ")
+            
+            if CMD_PART[-1] == "--lock":
+                func.os.system(f"net user {CMD_PART[1]} /ACTIVE:no")
+            elif CMD_PART[-1] == "--unlock":
+                func.os.system(f"net user {CMD_PART[1]} /ACTIVE:yes")
+            else:
+                print("This wasn't an Option!")
+        
+
         else:
             print("This wasn't an Option!")
 
