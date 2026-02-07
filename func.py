@@ -1,5 +1,6 @@
 import os, socket, secrets, hashlib, json, colorama
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from scapy.layers.l2 import ARP, Ether, srp
 
 class generall:
     def clear() -> None:
@@ -162,7 +163,19 @@ class net:
             :return: the MAC address
             :rtype: str
             """
+            arp_request = ARP(pdst=ip)
+            broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
+            packet = broadcast / arp_request
+
+            answered = srp(packet, timeout=2, verbose=False)[0]
+
+            if not answered:
+                raise ConnectionError("can't get MAC address!")
+            
+            return answered[0][1].hwsrc
     
 if __name__ == "__main__":
     generall.clear()
     print(generall.display_header("test in func.py"))
+    mac = net.MITM.get_mac("192.168.178.57")
+    print(mac)
