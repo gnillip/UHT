@@ -1,5 +1,6 @@
 import func, colorama, time
 from cryptography.fernet import Fernet
+import scapy
 
 colorama.init()
 
@@ -27,6 +28,7 @@ encrypt / enc                   (to encrypt a file)
 decrypt / dec                   (to decrypt a file, which was encrypted before)
 net                             (for locking / unlocking    usage: net [username] --lock or net [username] --unlock)
 passwd                          (to change password     usage: passwd [username] [new password])
+MITM                            (to do an Arp-Spoofing attack)
 {colorama.Fore.GREEN}""")
         
         elif CMD == "exit":
@@ -326,6 +328,9 @@ passwd                          (to change password     usage: passwd [username]
                 func.os.system(f"net user {CMD_PART[1]} {CMD_PART[2]}")
             else:
                 func.os.system(CMD)
+
+        elif CMD == "MITM":
+            pass
 
         else:
             print("This wasn't an Option!")

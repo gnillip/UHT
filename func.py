@@ -150,6 +150,19 @@ class net:
             cipher = data[12:]
             return aesgcm.decrypt(nonce, cipher, None)
     
+    class MITM:
+        def __init__(self, target_ip:str, gateway_ip:str):
+            self.target_ip = target_ip
+            self.gateway_ip = gateway_ip
+        
+        def get_mac(ip:str) -> str:
+            """           
+            :param ip: The IP of the Device, you want the mac of
+            :type ip: str
+            :return: the MAC address
+            :rtype: str
+            """
+    
 if __name__ == "__main__":
     generall.clear()
     print(generall.display_header("test in func.py"))
