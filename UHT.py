@@ -16,15 +16,17 @@ while True:
         if CMD == "help":
             print(f"{colorama.Fore.BLUE}commands:")
             print(f"""
-exit                (to exit the program)
-port-scan           (for scanning ports of an IP address)
-socket              (for socket communication)
-    - socket::enc   (for encrypted communication between 2 UHT's)
-    - socket::uni   (for universal communication, where you can send and recieve an Answer)
-encrypt / enc       (to encrypt a file)
-decrypt / dec       (to decrypt a file, which was encrypted before)
-net                 (for locking / unlocking    usage: net [username] --lock or net [username] --unlock)
-passwd              (to change password     usage: passwd [username] [new password])
+exit                            (to exit the program)
+port-scan                       (for scanning ports of an IP address)
+socket                          (for socket communication)
+    - socket::enc               (for encrypted communication between 2 UHT's)
+    - socket::file              (to transfer a file safely to another UHT user)
+        - socket::file::recv    (to recv a file)
+        - socket::file::send    (to send a file)
+encrypt / enc                   (to encrypt a file)
+decrypt / dec                   (to decrypt a file, which was encrypted before)
+net                             (for locking / unlocking    usage: net [username] --lock or net [username] --unlock)
+passwd                          (to change password     usage: passwd [username] [new password])
 {colorama.Fore.GREEN}""")
         
         elif CMD == "exit":
@@ -175,8 +177,81 @@ passwd              (to change password     usage: passwd [username] [new passwo
                     print("This wasn't an Option!")
                     continue
 
-            elif CMD == "socket::uni":
-                pass
+            elif CMD.startswith("socket::file"):
+                if CMD == "socket::file::send":
+                    FILEPATH = func.generall.ask("Filepath: ", colorama.Fore.GREEN)
+                    
+                    p:int = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1
+                    g:int = 2
+
+                    DH_KEY = func.net.DH(p, g)
+                    
+                    server:func.socket.socket = func.net.create_TCP()
+                    server.bind(("0.0.0.0", 13321))
+                    server.listen(1)
+
+                    conn, addr = server.accept()
+                    print("[*] conection from ", addr)
+
+                    conn.sendall(p.to_bytes((p.bit_length()+7)//8, "big"))
+                    conn.sendall(g.to_bytes((g.bit_length()+7)//8, "big"))
+
+                    pub_bytes = DH_KEY.public_key.to_bytes((DH_KEY.public_key.bit_length()+7)//8, byteorder="big")
+                    conn.sendall(len(pub_bytes).to_bytes(8, "big") + pub_bytes)
+
+                    their_pub_key_len = int.from_bytes(func.net.recv_exact(conn, 8), "big")
+                    their_pub_key = func.net.recv_exact(conn, their_pub_key_len)
+
+                    DH_KEY.generate_other(their_pub_key)
+
+                    Filename = DH_KEY.encrypt(func.generall.ask("The Name of the File: ", colorama.Fore.GREEN).encode())
+                    conn.send(len(Filename).to_bytes(6, "big") + Filename)
+
+                    with open(FILEPATH, "rb") as data:
+                        while True:
+                            chunk = data.read(64 * 1024)
+                            if not chunk:
+                                break
+
+                            enc = DH_KEY.encrypt(chunk)
+                            conn.sendall(len(enc).to_bytes(4, "big") + enc)
+                    conn.close()
+
+                elif CMD == "socket::file::recv":
+                    IP:str = func.generall.ask("IP: ", colorama.Fore.GREEN)
+                    client:func.socket.socket = func.net.create_TCP()
+                    client.connect((IP, 13321))
+
+                    p = int.from_bytes(client.recv(8192))
+                    g = int.from_bytes(client.recv(4096))
+
+                    DH_KEY = func.net.DH(p, g)
+
+                    their_pub_key_len = int.from_bytes(func.net.recv_exact(client, 8), "big")
+                    their_pub_key = func.net.recv_exact(client, their_pub_key_len)
+
+                    pub_bytes = DH_KEY.public_key.to_bytes((DH_KEY.public_key.bit_length()+7)//8, "big")
+                    client.sendall(len(pub_bytes).to_bytes(8, "big") + pub_bytes)
+
+                    DH_KEY.generate_other(their_pub_key)
+
+                    Filename_len = int.from_bytes(func.net.recv_exact(client, 6), "big")
+                    Filename = func.net.recv_exact(client, Filename_len)
+
+                    with open(Filename, "wb") as data:
+                        while True:
+                            try:
+                                chunk_len = int.from_bytes(func.net.recv_exact(client, 4), "big")
+                                chunk = func.net.recv_exact(client, chunk_len)
+
+                                dec = DH_KEY.decrypt(chunk)
+                                data.write(dec)
+                            except ConnectionError:
+                                client.close()
+
+                else:
+                    print("This wasn't an Option!")
+                    continue
 
             else:
                 print("This wasn't an Option!")
