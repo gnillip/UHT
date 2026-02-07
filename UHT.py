@@ -202,7 +202,7 @@ passwd                          (to change password     usage: passwd [username]
                     their_pub_key_len = int.from_bytes(func.net.recv_exact(conn, 8), "big")
                     their_pub_key = func.net.recv_exact(conn, their_pub_key_len)
 
-                    DH_KEY.generate_other(their_pub_key)
+                    DH_KEY.generate_other(int.from_bytes(their_pub_key, "big"))
 
                     Filename = DH_KEY.encrypt(func.generall.ask("The Name of the File: ", colorama.Fore.GREEN).encode())
                     conn.send(len(Filename).to_bytes(6, "big") + Filename)
@@ -233,12 +233,12 @@ passwd                          (to change password     usage: passwd [username]
                     pub_bytes = DH_KEY.public_key.to_bytes((DH_KEY.public_key.bit_length()+7)//8, "big")
                     client.sendall(len(pub_bytes).to_bytes(8, "big") + pub_bytes)
 
-                    DH_KEY.generate_other(their_pub_key)
+                    DH_KEY.generate_other(int.from_bytes(their_pub_key, "big"))
 
                     Filename_len = int.from_bytes(func.net.recv_exact(client, 6), "big")
-                    Filename = func.net.recv_exact(client, Filename_len)
+                    Filename = DH_KEY.decrypt(func.net.recv_exact(client, Filename_len))
 
-                    with open(Filename, "wb") as data:
+                    with open(Filename.decode(), "wb") as data:
                         while True:
                             try:
                                 chunk_len = int.from_bytes(func.net.recv_exact(client, 4), "big")
@@ -248,6 +248,7 @@ passwd                          (to change password     usage: passwd [username]
                                 data.write(dec)
                             except ConnectionError:
                                 client.close()
+                                break
 
                 else:
                     print("This wasn't an Option!")
